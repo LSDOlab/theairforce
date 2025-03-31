@@ -17,7 +17,7 @@ from lsdo_geo.core.parameterization.volume_sectional_parameterization import (
 recorder = csdl.Recorder(inline=True)
 recorder.start()
 
-geometry = lsdo_geo.import_geometry('bwb.stp')
+geometry = lsdo_geo.import_geometry('bwbv2.stp')
 # geometry.refit(fit_resolution=(100,100), num_coefficients=(30,30))
 
 
@@ -35,7 +35,9 @@ right_wing = geometry.declare_component(l_right)
 
 
 
-# geometry.plot(show=True)
+geometry.plot(show=True)
+
+exit()
 
 leading_edge_left = geometry.project(np.array([24.528, -22.423, 1.409]), plot=False)
 leading_edge_right = geometry.project(np.array([24.528, 22.423, 1.409]), plot=False)
