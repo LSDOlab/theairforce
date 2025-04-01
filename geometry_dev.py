@@ -49,11 +49,12 @@ center_wing_ffd_block = construct_ffd_block_around_entities(entities=center_wing
 # center_wing_ffd_block.plot()
 
 # left wing ffd block
-left_wing_ffd_block = construct_ffd_block_around_entities(entities=left_wing, num_coefficients=(10,3,2), degree=(1,1,1))
+# left_wing_ffd_block = construct_ffd_block_around_entities(entities=left_wing, num_coefficients=(2,2,2), degree=(1,1,1))
+left_wing_ffd_block = construct_ffd_block_around_entities(entities=left_wing, num_coefficients=(2,2,2), degree=(1,1,1))
 # left_wing_ffd_block.plot()
 
 # right wing ffd block
-right_wing_ffd_block = construct_ffd_block_around_entities(entities=right_wing, num_coefficients=(10,3,2), degree=(1,1,1))
+right_wing_ffd_block = construct_ffd_block_around_entities(entities=right_wing, num_coefficients=(2,2,2), degree=(1,1,1))
 # right_wing_ffd_block.plot()
 
 
@@ -69,17 +70,7 @@ dog_tail_1 = geometry.project(np.array([30.0, 0.0, 0.0]), plot=False)
 dog_tail_2 = geometry.project(np.array([27.148, 0.0, 0.476]), plot=False)
 
 
-# define wingspan as a function of the projected left and right leading edges
-# wingspan = csdl.norm(geometry.evaluate(left_leading_edge) - geometry.evaluate(right_leading_edge))
 
-
-
-# declare design variables
-wing_span = csdl.Variable(value=58.038)
-wing_span.set_as_design_variable(lower=1, scaler=1E-1)
-
-center_span = csdl.Variable(value=35.63)
-center_span.set_as_design_variable(lower=1, scaler=1E-1)
 
 
 
@@ -92,12 +83,12 @@ center_wing_ffd_sectional_parameterization = VolumeSectionalParameterization(nam
 
 left_wing_ffd_sectional_parameterization = VolumeSectionalParameterization(name="left_wing_ffd_sectional_parameterization", 
                                                                            parameterized_points=left_wing_ffd_block.coefficients, 
-                                                                           principal_parametric_dimension=0,)
+                                                                           principal_parametric_dimension=1,)
 # left_wing_ffd_sectional_parameterization.plot()
 
 right_wing_ffd_sectional_parameterization = VolumeSectionalParameterization(name="right_wing_ffd_sectional_parameterization", 
                                                                            parameterized_points=right_wing_ffd_block.coefficients, 
-                                                                           principal_parametric_dimension=0,)
+                                                                           principal_parametric_dimension=1,)
 # right_wing_ffd_sectional_parameterization.plot()
 
 
@@ -109,12 +100,78 @@ space_of_linear_2_dof_b_splines = lfs.BSplineSpace(num_parametric_dimensions=1, 
 
 
 
+
+
+
+
+
+
+# declare design variables
+# wing_span_dv = csdl.Variable(value=58.038)
+wing_span_dv = csdl.Variable(value=98.038)
+wing_span_array = csdl.Variable(value=np.zeros(2))
+wing_span_array = wing_span_array.set(csdl.slice[0], -10)
+wing_span_dv.set_as_design_variable(lower=1, scaler=1E-1)
+
+center_span_dv = csdl.Variable(value=19.782)
+center_span_dv.set_as_design_variable(lower=1, scaler=1E-1)
+
+
+
+# define wingspan as a function of the projected left and right leading edges
+wing_span = csdl.norm(geometry.evaluate(left_leading_edge) - geometry.evaluate(right_leading_edge))
+# print('wing span: ', wing_span.value)
+
+# define center span as a function of the projected left and right center section leading edges
+center_span = csdl.norm(geometry.evaluate(left_center_section_leading_edge) - geometry.evaluate(right_center_section_leading_edge))
+# print('center span: ', center_span.value)
+
+
+
+
+
+
+
+# parametric_b_spline_inputs = np.linspace(0.0, 1.0, 10).reshape((-1, 1))
+
+
+# wing_span_stretching_b_spline = lfs.Function(space=space_of_linear_2_dof_b_splines,
+#                                             coefficients=csdl.ImplicitVariable(shape=(2,), value=np.array([0., 0.])), 
+#                                             name='wingspan_stretching_b_spline_coefficients')
+
+# wingspan_stretch_sectional_parameters = wing_span_stretching_b_spline.evaluate(parametric_b_spline_inputs)
+
+
+# don't know what this does....
+wing_span_sectional_parameters = VolumeSectionalParameterizationInputs()
+wing_span_sectional_parameters.add_sectional_translation(axis=1, translation=wing_span_array)
+
+wing_span_ffd_coefficients = left_wing_ffd_sectional_parameterization.evaluate(wing_span_sectional_parameters, plot=True)
+left_wing_ffd_block.coefficients = wing_span_ffd_coefficients
+left_wing.set_coefficients(left_wing_ffd_block.evaluate(wing_span_ffd_coefficients, plot=False))
+
+
+
+geometry.plot()
+
+
+exit()
+
 # do everything with inner optimization ?????
 
 geometry_solver = ParameterizationSolver()
-
+geometry_solver.add_parameter(wing_span_stretching_b_spline.coefficients)
 
 geometric_variables = GeometricVariables()
+geometric_variables.add_variable(wing_span, wing_span_dv)
+geometric_variables.add_variable(center_span, center_span_dv)
+
+
+
+# geometry.plot()
+geometry_solver.evaluate(geometric_variables)
+geometry.plot()
+center_wing_ffd_block.plot()
 
 
 exit()
