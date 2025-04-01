@@ -73,6 +73,8 @@ right_center_section_leading_edge_rw = right_wing.project(np.array([17.815, 9.89
 dog_tail_1 = geometry.project(np.array([30.0, 0.0, 0.0]), plot=False)
 dog_tail_2 = geometry.project(np.array([27.148, 0.0, 0.476]), plot=False)
 
+nose = geometry.project(np.array([0.0, 0.0, 0.0]), plot=False)
+tail = geometry.project(np.array([30.0, 0.0, 0.0]), plot=False)
 
 
 
@@ -110,7 +112,7 @@ space_of_linear_2_dof_b_splines = lfs.BSplineSpace(num_parametric_dimensions=1, 
 
 
 
-wing_span_dv = csdl.Variable(value=61.70406371) # original value 51.70406371
+wing_span_dv = csdl.Variable(value=51.70406371) # original value 51.70406371
 wing_span_dv.set_as_design_variable(lower=1, scaler=1E-1)
 
 center_span_dv = csdl.Variable(value=19.782) # original value 19.782
@@ -118,12 +120,17 @@ center_span_dv.set_as_design_variable(lower=1, scaler=1E-1)
 
 outer_span = (wing_span_dv - center_span_dv) / 2 # length of outer wing segments
 
+outer_sweep_angle_dv = csdl.Variable(value=0.61423036) # original value 0.61423036
+
+# center_chord_dv = csdl.Variable(value=2.0) # original value 2.0
+
 
 # parameters for inner optimization
 left_outer_span_dv_array = csdl.Variable(value=np.zeros(2))
 right_outer_span_dv_array = csdl.Variable(value=np.zeros(2))
 center_span_dv_array = csdl.Variable(value=np.zeros(2))
-
+left_sweep_dv_array = csdl.Variable(value=np.zeros(2))
+right_sweep_dv_array = csdl.Variable(value=np.zeros(2))
 
 
 
@@ -145,7 +152,8 @@ center_span_dv_array = csdl.Variable(value=np.zeros(2))
 
 # don't know what this does....
 left_sectional_parameters = VolumeSectionalParameterizationInputs()
-left_sectional_parameters.add_sectional_translation(axis=1, translation=left_outer_span_dv_array)
+left_sectional_parameters.add_sectional_translation(axis=1, translation=left_outer_span_dv_array) # span translation
+left_sectional_parameters.add_sectional_translation(axis=0, translation=left_sweep_dv_array) # sweep translation
 
 left_wing_ffd_coefficients = left_wing_ffd_sectional_parameterization.evaluate(left_sectional_parameters, plot=False)
 left_wing_ffd_block.coefficients = left_wing_ffd_coefficients
@@ -155,6 +163,7 @@ left_wing.set_coefficients(left_wing_ffd_block.evaluate(left_wing_ffd_coefficien
 
 right_sectional_parameters = VolumeSectionalParameterizationInputs()
 right_sectional_parameters.add_sectional_translation(axis=1, translation=right_outer_span_dv_array)
+right_sectional_parameters.add_sectional_translation(axis=0, translation=right_sweep_dv_array) # sweep translation
 
 right_wing_ffd_coefficients = right_wing_ffd_sectional_parameterization.evaluate(right_sectional_parameters, plot=False)
 right_wing_ffd_block.coefficients = right_wing_ffd_coefficients
@@ -172,20 +181,34 @@ center_wing.set_coefficients(center_wing_ffd_block.evaluate(center_wing_ffd_coef
 
 
 
-
+# ---------- measure actual geometry values ----------
 # define wingspan as a function of the projected left and right leading edges
-left_outer_span = csdl.norm(geometry.evaluate(left_leading_edge) - geometry.evaluate(left_center_section_leading_edge_lw))
-right_outer_span = csdl.norm(geometry.evaluate(right_leading_edge) - geometry.evaluate(right_center_section_leading_edge_rw))
+left_outer_span = csdl.norm(geometry.evaluate(left_leading_edge)[1] - geometry.evaluate(left_center_section_leading_edge_lw)[1])
 # print('left outer span: ', left_outer_span.value)
+
+right_outer_span = csdl.norm(geometry.evaluate(right_leading_edge)[1] - geometry.evaluate(right_center_section_leading_edge_rw)[1])
 # print('right outer span: ', right_outer_span.value)
 
 # define center span as a function of the projected left and right center section leading edges
-center_span_inner = csdl.norm(geometry.evaluate(left_center_section_leading_edge_cw) - geometry.evaluate(right_center_section_leading_edge_cw))
+center_span_inner = csdl.norm(geometry.evaluate(left_center_section_leading_edge_cw)[1] - geometry.evaluate(right_center_section_leading_edge_cw)[1])
 # print('center span: ', center_span_inner.value)
 
-center_span_outer = csdl.norm(geometry.evaluate(left_center_section_leading_edge_lw) - geometry.evaluate(right_center_section_leading_edge_rw))
+center_span_outer = csdl.norm(geometry.evaluate(left_center_section_leading_edge_lw)[1] - geometry.evaluate(right_center_section_leading_edge_rw)[1])
 # print('center span: ', center_span_outer.value)
 
+left_joint = csdl.norm(geometry.evaluate(left_center_section_leading_edge_lw) - geometry.evaluate(left_center_section_leading_edge_cw))
+# print('left joint: ', left_joint.value)
+
+right_joint = csdl.norm(geometry.evaluate(right_center_section_leading_edge_rw) - geometry.evaluate(right_center_section_leading_edge_cw))
+# print('right joint: ', right_joint.value)
+
+
+left_direction = geometry.evaluate(left_leading_edge) - geometry.evaluate(left_center_section_leading_edge_lw)
+right_direction = geometry.evaluate(right_leading_edge) - geometry.evaluate(right_center_section_leading_edge_rw)
+left_sweep_angle = csdl.arccos(-left_direction[1] / csdl.norm(left_direction))
+right_sweep_angle = csdl.arccos(right_direction[1] / csdl.norm(right_direction))
+print('left sweep angle: ', left_sweep_angle.value)
+print('right sweep angle: ', right_sweep_angle.value)
 
 # exit()
 
@@ -195,12 +218,19 @@ geometry_solver = ParameterizationSolver()
 geometry_solver.add_parameter(left_outer_span_dv_array) # this needs to be the array thingy
 geometry_solver.add_parameter(right_outer_span_dv_array)
 geometry_solver.add_parameter(center_span_dv_array)
+geometry_solver.add_parameter(left_sweep_dv_array)
+geometry_solver.add_parameter(right_sweep_dv_array)
 
 geometric_variables = GeometricVariables()
 geometric_variables.add_variable(left_outer_span, outer_span)
 geometric_variables.add_variable(right_outer_span, outer_span)
 geometric_variables.add_variable(center_span_inner, center_span_dv)
 geometric_variables.add_variable(center_span_outer, center_span_dv)
+# geometric_variables.add_variable(left_sweep_angle, outer_sweep_angle_dv)
+# geometric_variables.add_variable(right_sweep_angle, outer_sweep_angle_dv)
+
+# geometric_variables.add_variable(left_joint, csdl.Variable(value=0))
+# geometric_variables.add_variable(right_joint, csdl.Variable(value=0))
 
 
 
