@@ -17,64 +17,110 @@ from lsdo_geo.core.parameterization.volume_sectional_parameterization import (
 recorder = csdl.Recorder(inline=True)
 recorder.start()
 
-geometry = lsdo_geo.import_geometry('bwbv2.stp')
-# geometry.refit(fit_resolution=(100,100), num_coefficients=(30,30))
+geometry = lsdo_geo.import_geometry('bwbv2nc.stp')
+# geometry.plot(show=True)
 
 
-# keys = geometry.function_names.keys()
-l_left = [20,21,22,23,24,25,26,27]
-l_center = [14,15,0,1,2,3,4,5,16,17,18,19]
-l_right = [6,7,8,9,10,11,12,13]
 
-left_wing = geometry.declare_component(l_left)
+# manually selected indices for the different surfaces
+_left_wing_indices = [16,17,18,19,20,21,22,23]
+_center_wing_indices = [12,13,14,15,0,1,2,3]
+_right_wing_indices = [4,5,6,7,8,9,10,11]
+
+
+left_wing = geometry.declare_component(_left_wing_indices)
 # left_wing.plot()
-center_wing = geometry.declare_component(l_center)
+
+center_wing = geometry.declare_component(_center_wing_indices)
 # center_wing.plot()
-right_wing = geometry.declare_component(l_right)
+
+right_wing = geometry.declare_component(_right_wing_indices)
 # right_wing.plot()
 
 
 
-geometry.plot(show=True)
-
-exit()
-
-leading_edge_left = geometry.project(np.array([24.528, -22.423, 1.409]), plot=False)
-leading_edge_right = geometry.project(np.array([24.528, 22.423, 1.409]), plot=False)
-
-dog_tail_1 = geometry.project(np.array([29.986, 0.0, -0.785]), plot=False)
-dog_tail_2 = geometry.project(np.array([29.626, 0.0, -0.741]), plot=False)
-# exit()
-
-num_ffd_sections = 5
+# num_ffd_sections = 5
 # num_wing_secctions = 3
 # ffd_block = construct_ffd_block_around_entities(entities=geometry, num_coefficients=(2, num_ffd_sections, 2), degree=(1,1,1))
 # ffd_block = construct_tight_fit_ffd_block(entities=geometry, num_coefficients=(2, (num_ffd_sections // num_wing_secctions + 1), 2), degree=(1,1,1))
-# ffd_block = construct_tight_fit_ffd_block(entities=geometry, num_coefficients=(2, 3, 2), degree=(1,1,1))
-# ffd_block.plot()
 
-
-# ffd_block = construct_ffd_block_around_entities(entities=left_wing, num_coefficients=(2, num_ffd_sections, 2), degree=(1,1,1)) # switch to corners thingy
-# ffd_block.plot()
-
+# center wing ffd block
 center_wing_ffd_block = construct_ffd_block_around_entities(entities=center_wing, num_coefficients=(10,3,2), degree=(1,1,1))
-# ffd_block.plot()
+# center_wing_ffd_block.plot()
 
+# left wing ffd block
+left_wing_ffd_block = construct_ffd_block_around_entities(entities=left_wing, num_coefficients=(10,3,2), degree=(1,1,1))
+# left_wing_ffd_block.plot()
 
-# exit()
-
-
-ffd_sectional_parameterization = VolumeSectionalParameterization(
-    name="ffd_sectional_parameterization",
-    parameterized_points=center_wing_ffd_block.coefficients,
-    principal_parametric_dimension=0,
-)
-# ffd_sectional_parameterization.plot()
+# right wing ffd block
+right_wing_ffd_block = construct_ffd_block_around_entities(entities=right_wing, num_coefficients=(10,3,2), degree=(1,1,1))
+# right_wing_ffd_block.plot()
 
 
 
+
+left_leading_edge = geometry.project(np.array([29.019, -25.852, 2.123]), plot=False)
+right_leading_edge = geometry.project(np.array([29.019, 25.852, 2.123]), plot=False)
+
+left_center_section_leading_edge = geometry.project(np.array([17.815, -9.891, 1.04]), plot=False)
+right_center_section_leading_edge = geometry.project(np.array([17.815, 9.891, 1.04]), plot=False)
+
+dog_tail_1 = geometry.project(np.array([30.0, 0.0, 0.0]), plot=False)
+dog_tail_2 = geometry.project(np.array([27.148, 0.0, 0.476]), plot=False)
+
+
+# define wingspan as a function of the projected left and right leading edges
+# wingspan = csdl.norm(geometry.evaluate(left_leading_edge) - geometry.evaluate(right_leading_edge))
+
+
+
+# declare design variables
+wing_span = csdl.Variable(value=58.038)
+wing_span.set_as_design_variable(lower=1, scaler=1E-1)
+
+center_span = csdl.Variable(value=35.63)
+center_span.set_as_design_variable(lower=1, scaler=1E-1)
+
+
+
+
+# i don't know what this does tbh...
+center_wing_ffd_sectional_parameterization = VolumeSectionalParameterization(name="center_wing_ffd_sectional_parameterization", 
+                                                                             parameterized_points=center_wing_ffd_block.coefficients, 
+                                                                             principal_parametric_dimension=0,)
+# center_wing_ffd_sectional_parameterization.plot()
+
+left_wing_ffd_sectional_parameterization = VolumeSectionalParameterization(name="left_wing_ffd_sectional_parameterization", 
+                                                                           parameterized_points=left_wing_ffd_block.coefficients, 
+                                                                           principal_parametric_dimension=0,)
+# left_wing_ffd_sectional_parameterization.plot()
+
+right_wing_ffd_sectional_parameterization = VolumeSectionalParameterization(name="right_wing_ffd_sectional_parameterization", 
+                                                                           parameterized_points=right_wing_ffd_block.coefficients, 
+                                                                           principal_parametric_dimension=0,)
+# right_wing_ffd_sectional_parameterization.plot()
+
+
+# i don't really know what this does either...
 space_of_linear_3_dof_b_splines = lfs.BSplineSpace(num_parametric_dimensions=1, degree=1, coefficients_shape=(3,))
 space_of_linear_2_dof_b_splines = lfs.BSplineSpace(num_parametric_dimensions=1, degree=1, coefficients_shape=(2,))
+
+
+
+
+
+# do everything with inner optimization ?????
+
+geometry_solver = ParameterizationSolver()
+
+
+geometric_variables = GeometricVariables()
+
+
+exit()
+
+
+
 
 
 """
